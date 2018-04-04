@@ -12,6 +12,7 @@
 NSString *const keyEDHSTUITextFieldFormatMobile = @"XXX XXXX XXXX";
 NSString *const keyEDHSTUITextFieldFormatBankCardNumber = @"XXXX XXXX XXXX XXXX XXX";
 
+static char keyEDHSTUITextFieldMaxLength;
 static char keyEDHSTUITextFieldRepeat;
 static char keyEDHSTUITextFieldFormat;
 static char keyEDHSTUITextFieldSegementSpacing;
@@ -31,6 +32,21 @@ static char keyEDHSTUITextFieldSegementSpacing;
 }
 
 #pragma mark - Accessors
+
+- (void)setMaxLength:(NSInteger)maxLength {
+    objc_setAssociatedObject(self,
+                             &keyEDHSTUITextFieldMaxLength,
+                             @(maxLength),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (NSInteger)maxLength {
+    NSNumber *maxLength = objc_getAssociatedObject(self, &keyEDHSTUITextFieldMaxLength);
+    if (!maxLength) {
+        return LONG_MAX;
+    }
+    return [maxLength integerValue];
+}
 
 - (void)setRepert:(BOOL)repert {
     objc_setAssociatedObject(self,
@@ -63,23 +79,17 @@ static char keyEDHSTUITextFieldSegementSpacing;
 }
 
 - (void)setFormat:(NSString *)format {
-    
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(edh_handleTextDidChangeNotification:)
-                                                     name:UITextFieldTextDidChangeNotification
-                                                   object:self];
 
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(edh_handleDidEndEditingNotification:)
-                                                     name:UITextFieldTextDidEndEditingNotification
-                                                   object:self];
-    });
+    //register notification when user set format first time
+    if (self.format == nil) {
+        [self p_registerNotification];
+    }
 
     objc_setAssociatedObject(self,
                              &keyEDHSTUITextFieldFormat,
                              format, OBJC_ASSOCIATION_COPY_NONATOMIC);
+
+    [self p_registerNotification];
 }
 
 - (NSString *)format {
@@ -87,6 +97,18 @@ static char keyEDHSTUITextFieldSegementSpacing;
 }
 
 #pragma mark - Handle Notification
+
+- (void)p_registerNotification {
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(edh_handleTextDidChangeNotification:)
+                                                 name:UITextFieldTextDidChangeNotification
+                                               object:self];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(edh_handleDidEndEditingNotification:)
+                                                 name:UITextFieldTextDidEndEditingNotification
+                                               object:self];
+}
 
 - (void)edh_handleTextDidChangeNotification:(NSNotification *)notification {
 
@@ -96,7 +118,7 @@ static char keyEDHSTUITextFieldSegementSpacing;
 
     //Execute format in next runloop. Make sure other object modify the text of this textField
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self p_formatString];
+        [self p_formatText];
     });
 }
 
@@ -118,20 +140,27 @@ static char keyEDHSTUITextFieldSegementSpacing;
     [dict removeObjectForKey:NSKernAttributeName];
     self.defaultTextAttributes = dict;
 
-    [self p_formatString];
+    [self p_formatText];
 }
 
 #pragma mark - Kern Implementation
 
-- (void)p_formatString {
+- (void)p_formatText {
 
     if (self.format.length == 0) return;
+
+    NSString *originalText = self.text;
+
+    //limit the text length 
+    if (originalText.length > self.maxLength) {
+        originalText = [originalText substringToIndex:self.maxLength];
+    }
 
     //add global attributes
     NSDictionary *globalAttributes = @{NSForegroundColorAttributeName: self.textColor,
                                        NSFontAttributeName: self.font
                                        };
-    NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:self.text
+    NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:originalText
                                                                                 attributes:globalAttributes];
 
     //divide segments
@@ -143,7 +172,7 @@ static char keyEDHSTUITextFieldSegementSpacing;
     //calc the loop count
     NSInteger loopCount = 1;
     if (self.repert) {
-        loopCount = ceil(self.text.length / (double)oneLoopTextLength);
+        loopCount = ceil(originalText.length / (double)oneLoopTextLength);
     }
 
     //build kern attribute
@@ -152,15 +181,17 @@ static char keyEDHSTUITextFieldSegementSpacing;
     //add kern attribute for each format loop
     for (int i = 0 ; i < loopCount; i++) {
 
-        NSInteger segmentLocation = 0 + i * oneLoopTextLength;
+        NSInteger indexOfCharWhichBeSpacingWithPrevOne = 0 + i * oneLoopTextLength;
         //add kern attribute for each segment
         for (NSString *segment in segments) {
+            if (segment.length == 0) break;
 
-            if (segment.length == 0) return;
+            indexOfCharWhichBeSpacingWithPrevOne += segment.length;
+            if (indexOfCharWhichBeSpacingWithPrevOne == self.maxLength) break;
 
-            segmentLocation += segment.length;
-            if (self.text.length > segmentLocation - 1) {
-                [attrStr addAttributes:kernAttribute range:NSMakeRange(segmentLocation - 1, 1)];
+            NSInteger location = indexOfCharWhichBeSpacingWithPrevOne - 1;
+            if (originalText.length > location) {
+                [attrStr addAttributes:kernAttribute range:NSMakeRange(location, 1)];
             }
         }
     }

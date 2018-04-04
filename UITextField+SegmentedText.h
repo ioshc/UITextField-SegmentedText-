@@ -13,6 +13,7 @@ extern NSString *const keyEDHSTUITextFieldFormatBankCardNumber;  //bank card num
 
 @interface UITextField (SegmentedText)
 
+@property (nonatomic) NSInteger maxLength;      //max length of text. Default is LONG_MAX
 @property (nonatomic) BOOL repert;              //should repeat the format. Default is NO
 @property (nonatomic) CGFloat segmentSpacing;   //spacing between segment. Default is 10.0f
 @property (nonatomic, copy) NSString *format;   //like "XXX XXXX XXXX" separated by blank space
