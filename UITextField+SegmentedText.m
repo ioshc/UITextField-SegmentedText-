@@ -34,14 +34,11 @@ static char keyEDHSTUITextFieldSegementSpacing;
 #pragma mark - Accessors
 
 - (void)setMaxLength:(NSInteger)maxLength {
-    objc_setAssociatedObject(self,
-                             &keyEDHSTUITextFieldMaxLength,
-                             @(maxLength),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [self p_setValue:@(maxLength) forPropertyKey:&keyEDHSTUITextFieldMaxLength];
 }
 
 - (NSInteger)maxLength {
-    NSNumber *maxLength = objc_getAssociatedObject(self, &keyEDHSTUITextFieldMaxLength);
+    NSNumber *maxLength = [self p_valueForPropertyKey:&keyEDHSTUITextFieldMaxLength];
     if (!maxLength) {
         return LONG_MAX;
     }
@@ -49,14 +46,11 @@ static char keyEDHSTUITextFieldSegementSpacing;
 }
 
 - (void)setRepert:(BOOL)repert {
-    objc_setAssociatedObject(self,
-                             &keyEDHSTUITextFieldRepeat,
-                             @(repert),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [self p_setValue:@(repert) forPropertyKey:&keyEDHSTUITextFieldRepeat];
 }
 
 - (BOOL)repert {
-    NSNumber *repeat = objc_getAssociatedObject(self, &keyEDHSTUITextFieldRepeat);
+    NSNumber *repeat = [self p_valueForPropertyKey:&keyEDHSTUITextFieldRepeat];
     if (!repeat) {
         return NO;
     }
@@ -64,14 +58,11 @@ static char keyEDHSTUITextFieldSegementSpacing;
 }
 
 - (void)setSegmentSpacing:(CGFloat)segmentSpacing {
-    objc_setAssociatedObject(self,
-                             &keyEDHSTUITextFieldSegementSpacing,
-                             @(segmentSpacing),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [self p_setValue:@(segmentSpacing) forPropertyKey:&keyEDHSTUITextFieldSegementSpacing];
 }
 
 - (CGFloat)segmentSpacing {
-    NSNumber *width = objc_getAssociatedObject(self, &keyEDHSTUITextFieldSegementSpacing);
+    NSNumber *width = [self p_valueForPropertyKey:&keyEDHSTUITextFieldSegementSpacing];
     if (!width) {
         return 10.0f;
     }
@@ -85,15 +76,24 @@ static char keyEDHSTUITextFieldSegementSpacing;
         [self p_registerNotification];
     }
 
-    objc_setAssociatedObject(self,
-                             &keyEDHSTUITextFieldFormat,
-                             format, OBJC_ASSOCIATION_COPY_NONATOMIC);
-
-    [self p_registerNotification];
+    [self p_setValue:format forPropertyKey:&keyEDHSTUITextFieldFormat];
 }
 
 - (NSString *)format {
-    return objc_getAssociatedObject(self, &keyEDHSTUITextFieldFormat);
+    return [self p_valueForPropertyKey:&keyEDHSTUITextFieldFormat];
+}
+
+#pragma mark - Runtime
+
+- (void)p_setValue:(id)value forPropertyKey:(const void *)propertyKey {
+    objc_setAssociatedObject(self,
+                             propertyKey,
+                             value,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (id)p_valueForPropertyKey:(const void *)propertyKey {
+    return objc_getAssociatedObject(self, propertyKey);
 }
 
 #pragma mark - Handle Notification
