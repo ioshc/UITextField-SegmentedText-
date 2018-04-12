@@ -24,11 +24,21 @@ static char keyEDHSTUITextFieldSegementSpacing;
 + (void)load {
     method_exchangeImplementations(class_getInstanceMethod(self.class, NSSelectorFromString(@"dealloc")),
                                    class_getInstanceMethod(self.class, @selector(edh_swizzledDealloc)));
+
+    method_exchangeImplementations(class_getInstanceMethod(self.class, NSSelectorFromString(@"setText:")),
+                                   class_getInstanceMethod(self.class, @selector(edh_swizzledSetText:)));
 }
 
 - (void)edh_swizzledDealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self edh_swizzledDealloc];
+}
+
+- (void)edh_swizzledSetText:(NSString*)text {
+    [self edh_swizzledSetText:text];
+    if (self.format) {
+        [self p_addKernToText];
+    }
 }
 
 #pragma mark - Accessors
@@ -116,10 +126,7 @@ static char keyEDHSTUITextFieldSegementSpacing;
         return;
     }
 
-    //Execute format in next runloop. Make sure other object modify the text of this textField
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self p_formatText];
-    });
+    [self p_addKernToText];
 }
 
 - (void)edh_handleDidEndEditingNotification:(NSNotification *)notification {
@@ -140,12 +147,12 @@ static char keyEDHSTUITextFieldSegementSpacing;
     [dict removeObjectForKey:NSKernAttributeName];
     self.defaultTextAttributes = dict;
 
-    [self p_formatText];
+    [self p_addKernToText];
 }
 
 #pragma mark - Kern Implementation
 
-- (void)p_formatText {
+- (void)p_addKernToText {
 
     if (self.format.length == 0) return;
 
