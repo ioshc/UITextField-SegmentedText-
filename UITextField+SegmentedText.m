@@ -24,21 +24,11 @@ static char keyEDHSTUITextFieldSegementSpacing;
 + (void)load {
     method_exchangeImplementations(class_getInstanceMethod(self.class, NSSelectorFromString(@"dealloc")),
                                    class_getInstanceMethod(self.class, @selector(edh_swizzledDealloc)));
-
-    method_exchangeImplementations(class_getInstanceMethod(self.class, NSSelectorFromString(@"setText:")),
-                                   class_getInstanceMethod(self.class, @selector(edh_swizzledSetText:)));
 }
 
 - (void)edh_swizzledDealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self edh_swizzledDealloc];
-}
-
-- (void)edh_swizzledSetText:(NSString*)text {
-    [self edh_swizzledSetText:text];
-    if (self.format) {
-        [self p_addKernToText];
-    }
 }
 
 #pragma mark - Accessors
@@ -93,6 +83,13 @@ static char keyEDHSTUITextFieldSegementSpacing;
     return [self p_valueForPropertyKey:&keyEDHSTUITextFieldFormat];
 }
 
+#pragma mark - Public
+
+- (void)edh_setSegmentedText:(NSString *)text {
+    self.text = text;
+    [self p_addKernToText];
+}
+
 #pragma mark - Runtime
 
 - (void)p_setValue:(id)value forPropertyKey:(const void *)propertyKey {
@@ -113,11 +110,6 @@ static char keyEDHSTUITextFieldSegementSpacing;
                                              selector:@selector(edh_handleTextDidChangeNotification:)
                                                  name:UITextFieldTextDidChangeNotification
                                                object:self];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(edh_handleDidEndEditingNotification:)
-                                                 name:UITextFieldTextDidEndEditingNotification
-                                               object:self];
 }
 
 - (void)edh_handleTextDidChangeNotification:(NSNotification *)notification {
@@ -125,27 +117,6 @@ static char keyEDHSTUITextFieldSegementSpacing;
     if (notification.object != self) {
         return;
     }
-
-    [self p_addKernToText];
-}
-
-- (void)edh_handleDidEndEditingNotification:(NSNotification *)notification {
-
-    if (notification.object != self) {
-        return;
-    }
-
-    /*  When user finish inputting, if typingAttributes contains Kern attribute, systerm will
-        save the Kern attribute into defaultTextAttributes and the defaultTextAttributes will
-        apply to all text.
-        eg. User want "XXX XXXX XXXX", user inputted "XXX XXXX |('|' is the cursor)", then finish
-            inputting, the text will change to "X X X X X X X", user input again, the text just like
-            "X X X ......" forever
-        So we need to remove the Kern attribute and format the text.
-    */
-    NSMutableDictionary *dict = [self.defaultTextAttributes mutableCopy];
-    [dict removeObjectForKey:NSKernAttributeName];
-    self.defaultTextAttributes = dict;
 
     [self p_addKernToText];
 }
@@ -191,13 +162,18 @@ static char keyEDHSTUITextFieldSegementSpacing;
         NSInteger indexOfCharWhichBeSpacingWithPrevOne = 0 + i * oneLoopTextLength;
         //add kern attribute for each segment
         for (NSString *segment in segments) {
+
             if (segment.length == 0) break;
 
+            //find the idx of char which will be adding space (begin with 1)
             indexOfCharWhichBeSpacingWithPrevOne += segment.length;
+
+            //dont add spacing to the last char
             if (indexOfCharWhichBeSpacingWithPrevOne == self.maxLength) break;
 
-            NSInteger location = indexOfCharWhichBeSpacingWithPrevOne - 1;
-            if (originalText.length > location) {
+            //just when the total length bigger than the idx of char which need to add spacing.
+            if (originalText.length > indexOfCharWhichBeSpacingWithPrevOne) {
+                NSInteger location = indexOfCharWhichBeSpacingWithPrevOne - 1;
                 [attrStr addAttributes:kernAttribute range:NSMakeRange(location, 1)];
             }
         }
